@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>אפליקציית המגדל</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#16241c;--muted:#5d6b63;--line:#c9d4cd;--accent:#1c6e45;--accent-ink:#fff;--warn:#9a4a00;--warn-bg:#fdeed8;--ok-bg:#d9f0e1}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Arial,sans-serif;font-size:17px;line-height:1.4}
+.page{max-width:560px;margin:0 auto;padding-block:12px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{background:var(--accent);color:var(--accent-ink);padding:14px 16px;border-radius:14px;margin:0 0 14px}
+header h1{font-size:21px;margin:0}header p{margin:2px 0 0;opacity:.9;font-size:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:17px;margin:0 0 10px}
+label{display:block;font-weight:700;font-size:14px;color:var(--muted);margin-bottom:10px}
+input,select{display:block;width:100%;font:600 18px inherit;padding:11px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);margin-top:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.photo{display:flex;flex-direction:column;align-items:center;gap:10px;border:2px dashed var(--accent);border-radius:12px;padding:16px;text-align:center;cursor:pointer;color:var(--accent);font-weight:700}
+.photo{margin-bottom:0;font-size:15px;min-height:74px;justify-content:center}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.thumbs div{position:relative}.thumbs img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.thumbs button{position:absolute;top:4px;inset-inline-start:4px;padding:0 9px;font-size:18px;line-height:28px;border-radius:14px;border:0;background:#000a;color:#fff}
+.dragging{outline:3px dashed var(--accent);outline-offset:4px}
+.photo input{display:none}
+.lineBox{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#fafcfb}
+.lineBox b{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+button{font:700 17px inherit;border-radius:10px;padding:12px 16px;border:2px solid var(--accent);background:#fff;color:var(--accent);cursor:pointer}
+button.main{background:var(--accent);color:var(--accent-ink);width:100%;font-size:19px;padding:15px}
+button.small{padding:4px 12px;font-size:14px;border-color:var(--line);color:var(--muted)}
+.bar{position:fixed;inset-inline:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.bar div{max-width:532px;margin:0 auto}
+.msg{border-radius:10px;padding:12px;font-weight:700;margin-bottom:12px}
+.msg.ok{background:var(--ok-bg);color:#14522f}.msg.bad{background:var(--warn-bg);color:var(--warn)}
+.sent{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}
+.sent:first-of-type{border-top:0}
+.tag{border-radius:12px;padding:2px 10px;font-size:13px;font-weight:700;white-space:nowrap;background:var(--warn-bg);color:var(--warn)}
+.tag.ok{background:var(--ok-bg);color:#14522f}
+.demo{font-size:13px;color:var(--muted);text-align:center;margin:6px 0 0}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{border:1px solid var(--line);padding:4px 6px;text-align:center}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="page">
+  <header><h1 id="hello">תעודת משלוח חדשה</h1><p id="company"></p></header>
+
+  <div id="pick" class="card" hidden>
+    <h2>בחירת מגדל (רק בגרסת ההדגמה)</h2>
+    <label>מגדל<select id="pickGrower"></select></label>
+    <p class="demo">בגרסה האמיתית כל מגדל מקבל קישור אישי ונכנס ישר לדף שלו.</p>
+  </div>
+
+  <div id="form" hidden>
+    <div id="msg" class="msg" hidden></div>
+    <div class="card">
+      <h2>1. צילומי התעודות</h2>
+      <div class="two">
+        <label class="photo">צילום עכשיו<input id="camera" type="file" accept="image/*" capture="environment"></label>
+        <label class="photo">בחירת תמונות שכבר צילמתי<input id="gallery" type="file" accept="image/*" multiple></label>
+      </div>
+      <p class="demo" id="pasteHint">אפשר לבחור כמה תמונות יחד, וגם להדביק או לגרור תמונות לכאן.</p>
+      <div id="thumbs" class="thumbs"></div>
+      <p class="demo">שולחים רק צילומים? לא צריך למלא כלום למטה. כל צילום נשלח כתעודה נפרדת, והמשרד קורא אותו.</p>
+    </div>
+    <div class="card">
+      <h2>2. פרטי התעודה</h2>
+      <div class="two"><label>תאריך<input id="date" type="date"></label><label>מספר תעודה<input id="note" inputmode="numeric" autocomplete="off"></label></div>
+      <label>לאיזה סיטונאי<select id="dest"></select></label>
+      <label id="destOtherBox" hidden>שם הסיטונאי<input id="destOther" autocomplete="off"></label>
+    </div>
+    <div class="card">
+      <h2>3. מה נשלח</h2>
+      <div id="lines"></div>
+      <button type="button" id="add">+ שורה נוספת</button>
+    </div>
+    <div class="card">
+      <h2>התעודות ששלחתי</h2>
+      <div id="sent"></div>
+    </div>
+    <p class="demo">גרסת הדגמה: התעודה נשמרת בטלפון הזה בלבד ועוד לא מגיעה למשרד.</p>
+  </div>
+
+  <div id="office" hidden>
+    <div class="card"><h2>תעודות שהתקבלו ממגדלים</h2><div id="inbox"></div>
+      <button type="button" id="export" style="margin-top:10px">הורדת קובץ לקליטה באגרוליין</button>
+      <p class="demo">הקובץ מכיל רק תעודות שאושרו. המשרד עובר עליו וקולט אותו במסך "קליטת משלוח חיצוני".</p></div>
+  </div>
+</div>
+<div class="bar" id="bar" hidden><div><button type="button" class="main" id="send">שליחת התעודה למשרד</button></div></div>
+
+<script>
+const CATALOG = [{"name": "מגדל לדוגמה", "company": "גרסת הדגמה", "wholesalers": ["סיטונאי א", "סיטונאי ב", "סיטונאי ג"], "fruits": [{"name": "עגבניה", "varieties": ["אשכול", "מגי", "שרי"], "sizes": []}, {"name": "מלפפון", "varieties": [], "sizes": []}, {"name": "פלפל", "varieties": ["אדום", "צהוב", "ירוק"], "sizes": []}, {"name": "חציל", "varieties": ["בלדי", "מובחר"], "sizes": []}, {"name": "מלון", "varieties": ["גליה", "כתום"], "sizes": ["5", "6", "7", "8"]}, {"name": "אבטיח", "varieties": ["סידלס"], "sizes": ["זוגות", "שלשות"]}], "qualities": ["א", "ב", "פרימיום"], "packagings": ["קרטון", "ארגז פלסטיק"], "pallets": ["משטח עץ", "משטח פלסטיק"]}];
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const STORE = 'grower-notes-demo-v1';
+const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } };
+const save = notes => { try { localStorage.setItem(STORE, JSON.stringify(notes)); } catch (e) {} };
+const fill = (select, values, first) => { select.textContent = ''; if (first) select.appendChild(new Option(first, '')); values.forEach(v => select.appendChild(new Option(v, v))); };
+const params = new URLSearchParams(location.hash.slice(1));
+let me = null, pictures = [];
+
+// A photo is shrunk before it is kept, so that a phone picture of several megabytes stays small.
+function shrink(file) {
+  return new Promise(done => {
+    if (!file.type.startsWith('image/')) { done(''); return; }
+    const img = new Image();
+    img.onload = () => { const k = Math.min(1, 1100 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = img.width * k; c.height = img.height * k; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); done(c.toDataURL('image/jpeg', 0.7)); };
+    img.onerror = () => done(''); img.src = URL.createObjectURL(file);
+  });
+}
+
+// Pictures arrive from the camera, from the gallery (several at once), by paste or by dragging them in.
+async function addPictures(files) {
+  for (const f of [...files]) { const p = await shrink(f); if (p) pictures.push(p); }
+  drawThumbs();
+}
+function drawThumbs() {
+  const box = $('thumbs'); box.textContent = '';
+  pictures.forEach((p, i) => { const d = el('div'), im = el('img'), x = el('button', '', '×'); im.src = p; im.alt = 'צילום ' + (i + 1); x.type = 'button';
+    x.setAttribute('aria-label', 'הסרת צילום ' + (i + 1)); x.onclick = () => { pictures.splice(i, 1); drawThumbs(); }; d.append(im, x); box.appendChild(d); });
+  $('send').textContent = pictures.length > 1 && !typedSomething() ? 'שליחת ' + pictures.length + ' צילומים למשרד' : 'שליחת התעודה למשרד';
+}
+const typedSomething = () => !!$('note').value.trim() || [...$('lines').children].some(b => b.querySelector('[data-k=fruit]').value || b.querySelector('[data-k=packages]').value || b.querySelector('[data-k=net]').value);
+
+function addLine() {
+  const box = el('div', 'lineBox'), head = el('b', '', ''), drop = el('button', 'small', 'הסרה'); drop.type = 'button';
+  const field = (label, node) => { const l = el('label', '', label); l.appendChild(node); return l; };
+  const pick = (name, values, first) => { const s = el('select'); s.dataset.k = name; fill(s, values, first); return s; };
+  const num = (name, hint) => { const i = el('input'); i.dataset.k = name; i.inputMode = 'decimal'; i.autocomplete = 'off'; if (hint) i.placeholder = hint; return i; };
+  const fruit = pick('fruit', me.fruits.map(f => f.name), 'בחירה'), variety = pick('variety', [], '');
+  fruit.addEventListener('change', () => { const f = me.fruits.find(x => x.name === fruit.value); fill(variety, f ? f.varieties : [], f && f.varieties.length ? 'בחירה' : 'אין זנים');
+    fill(box.querySelector('[data-k=size]'), f ? f.sizes : [], 'בלי גודל'); });
+  const two = (a, b) => { const d = el('div', 'two'); d.append(a, b); return d; };
+  box.append(head, field('תוצרת', fruit), two(field('זן', variety), field('גודל', pick('size', [], 'בלי גודל'))),
+    two(field('איכות', pick('quality', me.qualities, 'בלי')), field('אריזה', pick('packaging', me.packagings, 'בחירה'))),
+    two(field('כמה אריזות', num('packages')), field('משקל נטו (ק"ג)', num('net'))),
+    two(field('כמה משטחים', num('pallets', '1')), field('סוג משטח', pick('pallet_type', me.pallets, 'בחירה'))));
+  head.append(el('span'), drop);
+  drop.onclick = () => { if ($('lines').children.length > 1) { box.remove(); renumber(); } };
+  $('lines').appendChild(box); renumber();
+}
+const renumber = () => [...$('lines').children].forEach((b, i) => b.querySelector('b span').textContent = 'שורה ' + (i + 1));
+
+function sentList() {
+  const mine = load().filter(n => n.grower.name === me.name).reverse(), box = $('sent'); box.textContent = '';
+  if (!mine.length) box.appendChild(el('p', 'demo', 'עוד לא נשלחו תעודות.'));
+  mine.forEach(n => { const r = el('div', 'sent');
+    r.appendChild(el('span', '', n.photoOnly ? n.note + ' · ' + n.date : 'תעודה ' + n.note + ' · ' + n.date + ' · ' + n.destination.name + ' · ' + n.lines.reduce((a, l) => a + l.packages, 0) + ' אריזות' + ((n.photos || []).length ? ' · ' + n.photos.length + ' צילומים' : '')));
+    r.appendChild(el('span', 'tag' + (n.status === 'אושר' ? ' ok' : ''), n.status)); box.appendChild(r); });
+}
+
+function say(text, ok) { const m = $('msg'); m.hidden = false; m.className = 'msg ' + (ok ? 'ok' : 'bad'); m.textContent = text; m.scrollIntoView({block: 'center'}); }
+
+function send() {
+  const n = v => parseFloat(String(v).replace(',', '.')) || 0, dest = $('dest').value === '__other' ? $('destOther').value.trim() : $('dest').value;
+  const lines = [...$('lines').children].map(b => { const v = k => b.querySelector('[data-k=' + k + ']').value;
+    return {fruit: {name: v('fruit')}, variety: {name: v('variety')}, size: {name: v('size')}, quality: {name: v('quality')}, packaging: {name: v('packaging')},
+            packages: n(v('packages')), net: n(v('net')), pallets: n(v('pallets')) || 1, pallet_type: {name: v('pallet_type')}}; });
+  const all = load(), d = $('date').value, day = d.slice(8) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4);
+  // Pictures alone: nothing was typed, so every picture goes out as a note of its own for the office to read.
+  if (!typedSomething()) {
+    if (!pictures.length) { say('אין מה לשלוח: מוסיפים צילום של התעודה, או ממלאים את הפרטים.', false); return; }
+    pictures.forEach((p, i) => all.push({note: 'צילום ' + (all.filter(x => x.grower.name === me.name && x.photoOnly).length + 1), date: day, destination: {name: dest || 'לא צוין'},
+      grower: {name: me.name}, company: me.company, lines: [], photos: [p], photoOnly: true, status: 'ממתין לקריאה', sentAt: new Date().toLocaleString('he-IL')}));
+    save(all); say(pictures.length === 1 ? 'הצילום נשלח. המשרד יקרא אותו.' : 'נשלחו ' + pictures.length + ' צילומים, כל אחד כתעודה נפרדת. המשרד יקרא אותם.', true);
+    pictures = []; drawThumbs(); sentList(); return;
+  }
+  const missing = [];
+  if (!$('note').value.trim()) missing.push('מספר תעודה');
+  if (!dest) missing.push('סיטונאי');
+  lines.forEach((l, i) => { if (!l.fruit.name || !l.packages || !l.net) missing.push('שורה ' + (i + 1) + ': תוצרת, אריזות ומשקל'); });
+  if (missing.length) { say('חסר: ' + missing.join(' · '), false); return; }
+  if (all.some(x => x.grower.name === me.name && x.note === $('note').value.trim())) { say('תעודה ' + $('note').value.trim() + ' כבר נשלחה. אם זו תעודה אחרת, בדוק את המספר.', false); return; }
+  all.push({note: $('note').value.trim(), date: day, destination: {name: dest}, grower: {name: me.name}, company: me.company,
+            lines, photos: pictures.slice(), status: 'ממתין לאישור', sentAt: new Date().toLocaleString('he-IL')});
+  save(all);
+  say('תעודה ' + $('note').value.trim() + ' נשלחה. היא מחכה לאישור המשרד.', true);
+  $('note').value = ''; pictures = [];
+  $('lines').textContent = ''; addLine(); drawThumbs(); sentList();
+}
+
+function openGrower(name) {
+  me = CATALOG.find(g => g.name === name);
+  if (!me) return false;
+  $('pick').hidden = true; $('form').hidden = false; $('bar').hidden = false;
+  $('hello').textContent = 'שלום ' + me.name; $('company').textContent = 'תעודת משלוח חדשה · ' + me.company;
+  const t = new Date(), p = v => String(v).padStart(2, '0'); $('date').value = t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate());
+  fill($('dest'), me.wholesalers, 'בחירה'); $('dest').appendChild(new Option('סיטונאי אחר…', '__other'));
+  $('lines').textContent = ''; addLine(); sentList();
+  return true;
+}
+
+function openOffice() {
+  $('office').hidden = false; $('hello').textContent = 'תעודות ממגדלים'; $('company').textContent = 'מסך המשרד · הדגמה';
+  const draw = () => { const all = load(), box = $('inbox'); box.textContent = '';
+    if (!all.length) box.appendChild(el('p', 'demo', 'עוד לא התקבלו תעודות.'));
+    all.slice().reverse().forEach(n => { const c = el('div', 'lineBox'), head = el('b');
+      head.append(el('span', '', n.grower.name + ' · תעודה ' + n.note + ' · ' + n.date + ' · ' + n.destination.name), el('span', 'tag' + (n.status === 'אושר' ? ' ok' : ''), n.status)); c.appendChild(head);
+      const tb = el('table'); tb.hidden = !n.lines.length; tb.appendChild(el('tr')).innerHTML = '<th>תוצרת</th><th>זן</th><th>אריזה</th><th>אריזות</th><th>משקל נטו</th><th>משטחים</th>';
+      n.lines.forEach(l => { const tr = el('tr'); [l.fruit.name, l.variety.name, l.packaging.name, l.packages, l.net, l.pallets + ' ' + l.pallet_type.name].forEach(v => tr.appendChild(el('td', '', v))); tb.appendChild(tr); });
+      c.appendChild(tb);
+      (n.photos || []).forEach(p => { const im = el('img'); im.src = p; im.alt = 'צילום התעודה'; im.style.cssText = 'max-width:100%;margin-top:8px;border-radius:8px'; c.appendChild(im); });
+      const ok = el('button', 'small', n.status === 'אושר' ? 'ביטול האישור' : 'אישור התעודה'); ok.type = 'button'; ok.style.marginTop = '8px';
+      ok.onclick = () => { const list = load(), hit = list.find(x => x.note === n.note && x.grower.name === n.grower.name); hit.status = hit.status === 'אושר' ? 'ממתין לאישור' : 'אושר'; save(list); draw(); };
+      c.appendChild(ok); box.appendChild(c); }); };
+  // The file has the shape robot/import_file.py turns into Agroline's import workbook.
+  $('export').onclick = () => { const ready = load().filter(n => n.status === 'אושר' && n.lines.length).map(n => ({note: n.note, date: n.date, destination: n.destination, grower: n.grower, lines: n.lines}));
+    const a = el('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(ready, null, 1)], {type: 'application/json'})); a.download = 'תעודות_ממגדלים.json'; a.click(); };
+  draw();
+}
+
+['camera', 'gallery'].forEach(id => $(id).addEventListener('change', async () => { await addPictures($(id).files); $(id).value = ''; }));
+document.addEventListener('paste', e => { const files = [...(e.clipboardData || {files: []}).files].filter(f => f.type.startsWith('image/')); if (files.length && me) { e.preventDefault(); addPictures(files); } });
+document.addEventListener('dragover', e => { if (me) { e.preventDefault(); $('thumbs').parentNode.classList.add('dragging'); } });
+document.addEventListener('dragleave', () => $('thumbs').parentNode.classList.remove('dragging'));
+document.addEventListener('drop', e => { if (!me) return; e.preventDefault(); $('thumbs').parentNode.classList.remove('dragging'); addPictures([...e.dataTransfer.files].filter(f => f.type.startsWith('image/'))); });
+document.addEventListener('input', () => { if (me) drawThumbs(); });
+$('dest').addEventListener('change', () => $('destOtherBox').hidden = $('dest').value !== '__other');
+$('add').addEventListener('click', addLine);
+$('send').addEventListener('click', send);
+if (params.has('office')) openOffice();
+else if (!openGrower(params.get('g') || (CATALOG.length === 1 ? CATALOG[0].name : ''))) {
+  $('pick').hidden = false; fill($('pickGrower'), CATALOG.map(g => g.name), 'בחירה');
+  $('pickGrower').addEventListener('change', () => openGrower($('pickGrower').value));
+}
+</script>
+</body>
+</html>
