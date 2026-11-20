@@ -23,6 +23,14 @@ input,select{display:block;width:100%;font:600 18px inherit;padding:11px 10px;bo
 .thumbs div{position:relative}.thumbs img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
 .thumbs button{position:absolute;top:4px;inset-inline-start:4px;padding:0 9px;font-size:18px;line-height:28px;border-radius:14px;border:0;background:#000a;color:#fff}
 .dragging{outline:3px dashed var(--accent);outline-offset:4px}
+button.photo{width:100%;background:var(--card)}
+.cam{position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column}
+.cam video{flex:1;min-height:0;width:100%;object-fit:contain;background:#000}
+.cam.flash video{opacity:.25}
+.camBar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px max(18px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));color:#fff}
+.camBar b{min-width:90px;text-align:center;font-size:17px}
+#camDone{min-width:90px;background:#fff;border-color:#fff;color:#000}
+#shot{width:76px;height:76px;border-radius:50%;background:#fff;border:6px solid #9a9a9a;padding:0}
 .photo input{display:none}
 .lineBox{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#fafcfb}
 .lineBox b{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -57,12 +65,13 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{border:1px solid 
     <div class="card">
       <h2>1. צילומי התעודות</h2>
       <div class="two">
-        <label class="photo">צילום עכשיו<input id="camera" type="file" accept="image/*" capture="environment"></label>
+        <button type="button" class="photo" id="burst">צילום תעודות, אחת אחרי השנייה</button>
+        <label class="photo" id="oneShot" hidden>צילום אחד<input id="camera" type="file" accept="image/*" capture="environment"></label>
         <label class="photo">בחירת תמונות שכבר צילמתי<input id="gallery" type="file" accept="image/*" multiple></label>
       </div>
       <p class="demo" id="pasteHint">אפשר לבחור כמה תמונות יחד, וגם להדביק או לגרור תמונות לכאן.</p>
       <div id="thumbs" class="thumbs"></div>
-      <p class="demo">שולחים רק צילומים? לא צריך למלא כלום למטה. כל צילום נשלח כתעודה נפרדת, והמשרד קורא אותו.</p>
+      <p class="demo">שולחים רק צילומים? לא צריך למלא כלום למטה. כל צילום נשלח כתעודה נפרדת. "ממתין לקריאה" פירושו שהמשרד עוד לא קרא את הצילום והכניס את הפרטים שלו.</p>
     </div>
     <div class="card">
       <h2>2. פרטי התעודה</h2>
@@ -88,6 +97,10 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{border:1px solid 
       <p class="demo">הקובץ מכיל רק תעודות שאושרו. המשרד עובר עליו וקולט אותו במסך "קליטת משלוח חיצוני".</p></div>
   </div>
 </div>
+<div class="cam" id="cam" dir="rtl" hidden>
+  <video id="video" playsinline autoplay muted></video>
+  <div class="camBar"><button type="button" id="camDone">סיום</button><button type="button" id="shot" aria-label="צילום תעודה"></button><b id="camCount">0 צולמו</b></div>
+</div>
 <div class="bar" id="bar" hidden><div><button type="button" class="main" id="send">שליחת התעודה למשרד</button></div></div>
 
 <script>
@@ -96,7 +109,7 @@ const $ = id => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const STORE = 'grower-notes-demo-v1';
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } };
-const save = notes => { try { localStorage.setItem(STORE, JSON.stringify(notes)); } catch (e) {} };
+const save = notes => { try { localStorage.setItem(STORE, JSON.stringify(notes)); return true; } catch (e) { return false; } };
 const fill = (select, values, first) => { select.textContent = ''; if (first) select.appendChild(new Option(first, '')); values.forEach(v => select.appendChild(new Option(v, v))); };
 const params = new URLSearchParams(location.hash.slice(1));
 let me = null, pictures = [];
@@ -117,6 +130,27 @@ async function addPictures(files) {
   for (const f of [...files]) { const p = await shrink(f); if (p) pictures.push(p); }
   drawThumbs();
 }
+// The page's own camera: it stays open, so ten notes are ten presses and one "done".
+let stream = null;
+async function openCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080}}, audio: false});
+    $('video').srcObject = stream; $('cam').hidden = false; $('camCount').textContent = pictures.length + ' צולמו';
+  } catch (e) {
+    // No camera permission, or a browser that does not offer it: the phone's own camera takes one picture at a time instead.
+    $('oneShot').hidden = false; $('burst').hidden = true;
+    say('לא הצלחתי לפתוח את המצלמה בתוך הדף. אפשר לצלם תמונה אחת בכל פעם, או לבחור תמונות שכבר צולמו.', false);
+  }
+}
+function takeShot() {
+  const v = $('video'); if (!v.videoWidth) return;
+  const k = Math.min(1, 1100 / Math.max(v.videoWidth, v.videoHeight)), c = document.createElement('canvas');
+  c.width = v.videoWidth * k; c.height = v.videoHeight * k; c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  pictures.push(c.toDataURL('image/jpeg', 0.7)); $('camCount').textContent = pictures.length + ' צולמו';
+  $('cam').classList.add('flash'); setTimeout(() => $('cam').classList.remove('flash'), 120);
+}
+function closeCamera() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; $('cam').hidden = true; drawThumbs(); }
+
 function drawThumbs() {
   const box = $('thumbs'); box.textContent = '';
   pictures.forEach((p, i) => { const d = el('div'), im = el('img'), x = el('button', '', '×'); im.src = p; im.alt = 'צילום ' + (i + 1); x.type = 'button';
@@ -165,7 +199,8 @@ function send() {
     if (!pictures.length) { say('אין מה לשלוח: מוסיפים צילום של התעודה, או ממלאים את הפרטים.', false); return; }
     pictures.forEach((p, i) => all.push({note: 'צילום ' + (all.filter(x => x.grower.name === me.name && x.photoOnly).length + 1), date: day, destination: {name: dest || 'לא צוין'},
       grower: {name: me.name}, company: me.company, lines: [], photos: [p], photoOnly: true, status: 'ממתין לקריאה', sentAt: new Date().toLocaleString('he-IL')}));
-    save(all); say(pictures.length === 1 ? 'הצילום נשלח. המשרד יקרא אותו.' : 'נשלחו ' + pictures.length + ' צילומים, כל אחד כתעודה נפרדת. המשרד יקרא אותם.', true);
+    if (!save(all)) { say('אין מספיק מקום בטלפון לשמור את כל הצילומים בגרסת ההדגמה. שולחים פחות צילומים בכל פעם.', false); return; }
+    say(pictures.length === 1 ? 'הצילום נשלח. הוא מחכה שהמשרד יקרא אותו ויכניס את הפרטים.' : 'נשלחו ' + pictures.length + ' צילומים, כל אחד כתעודה נפרדת. הם מחכים שהמשרד יקרא אותם ויכניס את הפרטים.', true);
     pictures = []; drawThumbs(); sentList(); return;
   }
   const missing = [];
@@ -220,6 +255,7 @@ document.addEventListener('drop', e => { if (!me) return; e.preventDefault(); $(
 document.addEventListener('input', () => { if (me) drawThumbs(); });
 $('dest').addEventListener('change', () => $('destOtherBox').hidden = $('dest').value !== '__other');
 $('add').addEventListener('click', addLine);
+$('burst').addEventListener('click', openCamera); $('shot').addEventListener('click', takeShot); $('camDone').addEventListener('click', closeCamera);
 $('send').addEventListener('click', send);
 if (params.has('office')) openOffice();
 else if (!openGrower(params.get('g') || (CATALOG.length === 1 ? CATALOG[0].name : ''))) {
